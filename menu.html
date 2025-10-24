@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema Liga de Fútbol</title>
+    <link rel="stylesheet" href="styles_menu.css">
+</head>
+
+<body>
+    <div class="sidebar">
+        <h2>⚽ Liga</h2>
+        <button class="active" onclick="mostrar('inicio')">Inicio</button>
+        <button onclick="mostrar('equipos')">Equipos</button>
+        <button onclick="mostrar('partidos')">Partidos</button>
+        <button onclick="mostrar('audio')">Audio</button>
+        <button onclick="mostrar('galeria')">Galería</button>
+        <button onclick="mostrar('faseFinal')">Fase Final</button>
+        <button onclick="cerrarSesion()">Cerrar Sesión</button>
+    </div>
+
+    <div class="main" id="contenido">
+        <!-- Inicio -->
+        <div id="inicio" class="seccion">
+            <h1>Bienvenido a la Liga de Fútbol ⚽</h1>
+            <p>Selecciona una opción del menú lateral para comenzar.</p>
+        </div>
+
+        <!-- Equipos -->
+        <div id="equipos" class="seccion" style="display:none;">
+            <h1>Gestión de Equipos</h1>
+            <form id="formEquipos">
+                <label>Nombre del equipo:</label>
+                <input type="text" id="nombreEquipo" required>
+
+                <label>Número de integrantes:</label>
+                <input type="number" id="numIntegrantes" min="1" required>
+
+                <label>Capitán del equipo:</label>
+                <input type="text" id="capitanEquipo" required>
+            </form>
+
+            <div class="crud-btns">
+                <button onclick="crearEquipo()">Crear</button>
+                <button onclick="editarEquipo()">Editar / Guardar</button>
+                <button onclick="cancelarOperacion()">Cancelar</button>
+                <button onclick="borrarEquipo()">Borrar</button>
+            </div>
+
+            <table id="tablaEquipos">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Nombre equipo</th>
+                        <th>Número integrantes</th>
+                        <th>Capitán</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+
+        <!-- Partidos -->
+        <div id="partidos" class="seccion" style="display:none;">
+            <h1>Gestión de Partidos</h1>
+            <form id="formPartidos">
+                <label>Selecciona equipo 1:</label>
+                <select id="equipo1"></select>
+
+                <label>Selecciona equipo 2:</label>
+                <select id="equipo2"></select>
+            </form>
+
+            <div class="crud-btns">
+                <button onclick="crearPartido()">Crear</button>
+                <button onclick="editarPartido()">Editar / Guardar</button>
+                <button onclick="cancelarOperacionPartido()">Cancelar</button>
+                <button onclick="borrarPartido()">Borrar</button>
+                <button onclick="registrarGanadoresPartidos()">Registrar Ganadores</button>
+                <button onclick="generarFaseFinal()">Generar Fase Final</button>
+            </div>
+
+            <table id="tablaPartidos">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Equipo 1</th>
+                        <th>Marcador</th>
+                        <th>Equipo 2</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+
+        </div>
+
+        <!-- Fase Final -->
+        <div id="faseFinal" class="seccion" style="display:none;">
+            <h1>Fase Final</h1>
+
+            <label>Selecciona fase de inicio:</label>
+            <select id="faseInicio">
+                <option value="cuartos">Cuartos de Final</option>
+                <option value="semifinal">Semifinal</option>
+            </select>
+
+            <div style="margin-top:10px;">
+                <button onclick="generarFaseFinal()">Generar Cruces</button>
+                <button onclick="determinarGanadores()">Registrar Ganadores</button>
+            </div>
+
+            <table id="tablaFaseFinal" style="margin-top:10px;">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Equipo 1</th>
+                        <th>Goles 1</th>
+                        <th>Equipo 2</th>
+                        <th>Ganador</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+
+
+
+        <!-- Audio -->
+        <div id="audio" class="seccion" style="display:none;">
+            <h1>Audio Ambiente</h1>
+            <p>Reproduce sonidos de estadio mientras trabajas.</p>
+            <audio controls loop>
+                <source src="audioFut.mp3" type="audio/mp3">
+                Tu navegador no soporta el audio.
+            </audio>
+
+            <audio controls loop>
+                <source src="audioFut2.mp3" type="audio/mp3">
+            </audio>
+        </div>
+
+        <!-- Galería -->
+        <div id="galeria" class="seccion" style="display:none;">
+            <h1>Galería de Escudos</h1>
+            <label>Selecciona equipo:</label>
+            <select id="selectGaleria"></select>
+
+            <div style="margin-top:10px;">
+                <button id="btnAgregar" disabled>Agregar Escudo</button>
+                <button id="btnCambiar" disabled>Cambiar Escudo</button>
+                <button id="btnEliminar" disabled>Eliminar Escudo</button>
+            </div>
+
+            <div class="galeria-grid" id="galeriaGrid"></div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+
+</html>
