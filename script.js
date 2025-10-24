@@ -563,55 +563,183 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 });
 
+//===========================================================================================
+// FASE FINAL
+// ==========================
+let equiposGanadores = []; // Se llena desde los partidos
 
-// ======= FASE FINAL ==============
+document.addEventListener("DOMContentLoaded", () => {
+    const rondasContainer = document.getElementById("rondasContainer");
+    const faseInicio = document.getElementById("faseInicio");
+    const btnGenerarRonda = document.getElementById("btnGenerarRonda");
+
+    btnGenerarRonda.addEventListener("click", () => {
+        if (!equiposGanadores.length) {
+            alert("No hay ganadores registrados de los partidos.");
+            return;
+        }
+        generarFaseFinal(faseInicio.value);
+    });
+});
+
+// ================= Registrar Ganadores de Partidos =================
 function registrarGanadoresPartidos() {
     const filas = document.querySelectorAll("#tablaPartidos tbody tr");
     equiposGanadores = [];
 
     filas.forEach(fila => {
-        let marcador = fila.children[2].querySelector(".inputMarcador")?.value || fila.children[2].textContent;
-        const goles = marcador.split("-").map(n => parseInt(n.trim()));
-        if (goles[0] > goles[1]) equiposGanadores.push(fila.children[1].textContent);
-        else if (goles[1] > goles[0]) equiposGanadores.push(fila.children[3].textContent);
-        // si empate, ignorar o pedir desempate
+        const marcador = fila.children[2].querySelector(".inputMarcador")?.value || fila.children[2].textContent;
+        if (!marcador.includes("-")) return;
+        const [g1, g2] = marcador.split("-").map(n => parseInt(n.trim()));
+        if (isNaN(g1) || isNaN(g2)) return;
+
+        if (g1 > g2) equiposGanadores.push(fila.children[1].textContent);
+        else if (g2 > g1) equiposGanadores.push(fila.children[3].textContent);
     });
 
-    console.log("Equipos ganadores actualizados:", equiposGanadores);
+    console.log("Ganadores registrados:", equiposGanadores);
 }
 
-function generarFaseFinal() {
-    const fase = document.getElementById("faseInicio").value;
-    const tbody = document.querySelector("#tablaFaseFinal tbody");
-    tbody.innerHTML = "";
+// ================= Generar Fase Final =================
+function generarFaseFinal(fase) {
+    const rondasContainer = document.getElementById("rondasContainer");
+    rondasContainer.innerHTML = "";
 
-    // Tomar los equipos ganadores ya registrados
     let equipos = [...equiposGanadores];
-
-    // Validar cantidad de equipos según fase
     const cantidadNecesaria = fase === "cuartos" ? 8 : 4;
+
     if (equipos.length < cantidadNecesaria) {
         alert(`Se necesitan ${cantidadNecesaria} equipos para ${fase}`);
         return;
     }
 
-    equipos = equipos.slice(0, cantidadNecesaria); // solo los necesarios
+    equipos = equipos.slice(0, cantidadNecesaria);
+    let rondaActual = fase;
 
-    // Generar cruces
+    while (equipos.length >= 2) {
+        crearTablaRonda(rondaActual, equipos);
+        // Preparar siguiente ronda con ganadores "-"
+        const siguienteRonda = [];
+        for (let i = 0; i < Math.floor(equipos.length / 2); i++) {
+            siguienteRonda.push("-", "-");
+        }
+        equipos = siguienteRonda;
+
+        if (rondaActual === "cuartos") rondaActual = "semifinal";
+        else if (rondaActual === "semifinal") rondaActual = "final";
+        else break;
+    }
+
+    // Actualizar automáticamente con ganadores válidos
+    actualizarSiguienteRonda();
+}
+
+// ================= Crear Tabla de Cada Ronda =================
+function crearTablaRonda(nombreRonda, equipos) {
+    const rondasContainer = document.getElementById("rondasContainer");
+    const div = document.createElement("div");
+    div.style.marginTop = "20px";
+    div.innerHTML = `<h2>${nombreRonda.charAt(0).toUpperCase() + nombreRonda.slice(1)}</h2>`;
+
+    const table = document.createElement("table");
+    table.style.marginTop = "5px";
+    table.style.borderCollapse = "collapse";
+    table.innerHTML = `
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Equipo 1</th>
+                <th>Marcador</th>
+                <th>Equipo 2</th>
+                <th>Ganador</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    `;
+    div.appendChild(table);
+    rondasContainer.appendChild(div);
+
+    const tbody = table.querySelector("tbody");
+
     for (let i = 0; i < equipos.length; i += 2) {
+        const eq1 = equipos[i] || "-";
+        const eq2 = equipos[i + 1] || "-";
+
         const tr = document.createElement("tr");
         tr.innerHTML = `
             <td>${i / 2 + 1}</td>
-            <td>${equipos[i]}</td>
-            <td><input type="number" class="gol1" min="0" value="0" style="width:40px;text-align:center;"></td>
-            <td>${equipos[i + 1]}</td>
+            <td>${eq1}</td>
+            <td><input type="text" class="inputMarcador" value="0-0" style="width:50px;text-align:center;"></td>
+            <td>${eq2}</td>
             <td class="ganador">-</td>
         `;
         tbody.appendChild(tr);
+
+        const inputMarcador = tr.querySelector(".inputMarcador");
+        inputMarcador.addEventListener("blur", () => { // cambiar input a "blur" para procesar al terminar
+            actualizarGanadorFila(tr);
+            actualizarSiguienteRonda();
+        });
+    }
+}
+
+// ================= Actualizar ganador de una fila =================
+function actualizarGanadorFila(fila) {
+    const marcador = fila.querySelector(".inputMarcador").value.trim();
+    const eq1 = fila.children[1].textContent;
+    const eq2 = fila.children[3].textContent;
+    const tdGanador = fila.querySelector(".ganador");
+
+    if (!marcador.includes("-")) {
+        tdGanador.textContent = "-";
+        return;
+    }
+
+    const [g1, g2] = marcador.split("-").map(n => parseInt(n.trim()));
+    if (isNaN(g1) || isNaN(g2)) {
+        tdGanador.textContent = "-";
+        return;
+    }
+
+    tdGanador.textContent = g1 > g2 ? eq1 : g2 > g1 ? eq2 : "-";
+}
+
+// ================= Actualizar Siguiente Ronda =================
+function actualizarSiguienteRonda() {
+    const rondasContainer = document.getElementById("rondasContainer");
+    const tablas = rondasContainer.querySelectorAll("table");
+
+    for (let t = 0; t < tablas.length - 1; t++) {
+        const filas = tablas[t].querySelectorAll("tbody tr");
+        const siguiente = tablas[t + 1].querySelectorAll("tbody tr");
+
+        let idxSiguiente = 0;
+        let equipoPos = 1;
+
+        filas.forEach(fila => {
+            const ganador = fila.querySelector(".ganador").textContent;
+            if (!ganador || ganador === "-") return;
+
+            const c1 = siguiente[idxSiguiente].children[1];
+            const c2 = siguiente[idxSiguiente].children[3];
+
+            if (equipoPos === 1) {
+                if (c1.textContent === "-") c1.textContent = ganador;
+                equipoPos = 2;
+            } else {
+                if (c2.textContent === "-") c2.textContent = ganador;
+                equipoPos = 1;
+                idxSiguiente++;
+            }
+        });
     }
 }
 
 
+
+// ====================================================================================================
+
+//CODIGO PARTE GALERIA
 function actualizarCombosEquipos(equipos) {
     const select1 = document.getElementById("equipo1");
     const select2 = document.getElementById("equipo2");

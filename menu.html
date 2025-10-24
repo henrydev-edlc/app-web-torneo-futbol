@@ -106,23 +106,13 @@
             </select>
 
             <div style="margin-top:10px;">
-                <button onclick="generarFaseFinal()">Generar Cruces</button>
-                <button onclick="determinarGanadores()">Registrar Ganadores</button>
+                <button id="btnGenerarRonda">Generar Ronda</button>
             </div>
 
-            <table id="tablaFaseFinal" style="margin-top:10px;">
-                <thead>
-                    <tr>
-                        <th>#</th>
-                        <th>Equipo 1</th>
-                        <th>Goles 1</th>
-                        <th>Equipo 2</th>
-                        <th>Ganador</th>
-                    </tr>
-                </thead>
-                <tbody></tbody>
-            </table>
+            <!-- Aquí se generarán dinámicamente todas las tablas de cada fase -->
+            <div id="rondasContainer" style="margin-top:15px;"></div>
         </div>
+
 
 
 
