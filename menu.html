@@ -14,7 +14,7 @@
         <button class="active" onclick="mostrar('inicio')">Inicio</button>
         <button onclick="mostrar('equipos')">Equipos</button>
         <button onclick="mostrar('partidos')">Partidos</button>
-        <button onclick="mostrar('audio')">Audio</button>
+        <!-- <button onclick="mostrar('audio')">Audio</button> -->
         <button onclick="mostrar('galeria')">Galería</button>
         <button onclick="mostrar('faseFinal')">Fase Final</button>
         <button onclick="cerrarSesion()">Cerrar Sesión</button>
@@ -146,7 +146,9 @@
         <div id="galeria" class="seccion" style="display:none;">
             <h1>Galería de Escudos</h1>
             <label>Selecciona equipo:</label>
-            <select id="selectGaleria"></select>
+            <select id="selectGaleria">
+                <option value="#">Equipo</option>
+            </select>
 
             <div style="margin-top:10px;">
                 <button id="btnAgregar" disabled>Agregar Escudo</button>

@@ -443,76 +443,125 @@ function cancelarOperacionPartido() {
 
 
 
-
 // =========================
 // GALERÍA DE ESCUDOS
 // =========================
+// =========================
+// GALERÍA DE ESCUDOS (versión final dinámica)
+// =========================
 
-// Selecciones
-const selectGaleria = document.getElementById("selectGaleria");
-const btnAgregar = document.getElementById("btnAgregar");
-const galeriaGrid = document.getElementById("galeriaGrid");
+document.addEventListener("DOMContentLoaded", () => {
+    const selectGaleria = document.getElementById("selectGaleria");
+    const btnAgregar = document.getElementById("btnAgregar");
+    const btnCambiar = document.getElementById("btnCambiar");
+    const btnEliminar = document.getElementById("btnEliminar");
+    const galeriaGrid = document.getElementById("galeriaGrid");
 
-// Input file invisible
-const inputFile = document.createElement("input");
-inputFile.type = "file";
-inputFile.accept = "image/*";
+    let idEquipoSeleccionado = null;
+    const escudos = {}; // { idEquipo: { nombre, src } }
 
-// Variable para el equipo seleccionado
-let equipoSeleccionado2 = "";
+    // ✅ Esperar a que los equipos se carguen en el select
+    // (se asume que ya están cargados dinámicamente desde tu sistema)
+    // Si los equipos se cargan después con JS, este listener seguirá funcionando bien
 
-// Botón Agregar
-btnAgregar.addEventListener("click", () => {
-    equipoSeleccionado = selectGaleria.value;
-    inputFile.click(); // abre explorer
-});
+    // === Evento cambio en select (cuando se elige un equipo) ===
+    selectGaleria.addEventListener("change", () => {
+        idEquipoSeleccionado = selectGaleria.value;
+        actualizarBotones();
+        mostrarEscudos();
+    });
 
-// Cuando se selecciona archivo
-inputFile.addEventListener("change", () => {
-    if (inputFile.files.length > 0) {
-        const file = inputFile.files[0];
-        const formData = new FormData();
-        formData.append("accion", "agregarEscudo");
-        formData.append("equipo", equipoSeleccionado2);
-        formData.append("escudo", file);
+    // === Agregar Escudo ===
+    btnAgregar.addEventListener("click", () => {
+        if (!idEquipoSeleccionado) return;
 
-        fetch("operaciones.php", { method: "POST", body: formData })
-            .then(res => res.json())
-            .then(data => {
-                if (data.ok) {
-                    listarGaleria(); // refresca galería
-                } else {
-                    alert("Error al subir imagen: " + data.error);
-                }
+        const input = document.createElement("input");
+        input.type = "file";
+        input.accept = "image/*";
+
+        input.onchange = e => {
+            const archivo = e.target.files[0];
+            if (!archivo) return;
+
+            const lector = new FileReader();
+            lector.onload = ev => {
+                const nombreEquipo = selectGaleria.options[selectGaleria.selectedIndex].text;
+                escudos[idEquipoSeleccionado] = {
+                    nombre: nombreEquipo,
+                    src: ev.target.result
+                };
+                mostrarEscudos();
+                actualizarBotones();
+            };
+            lector.readAsDataURL(archivo);
+        };
+
+        input.click();
+    });
+
+    // === Cambiar Escudo ===
+    btnCambiar.addEventListener("click", () => {
+        if (!idEquipoSeleccionado || !escudos[idEquipoSeleccionado]) return;
+
+        const input = document.createElement("input");
+        input.type = "file";
+        input.accept = "image/*";
+
+        input.onchange = e => {
+            const archivo = e.target.files[0];
+            if (!archivo) return;
+
+            const lector = new FileReader();
+            lector.onload = ev => {
+                escudos[idEquipoSeleccionado].src = ev.target.result;
+                mostrarEscudos();
+            };
+            lector.readAsDataURL(archivo);
+        };
+
+        input.click();
+    });
+
+    // === Eliminar Escudo ===
+    btnEliminar.addEventListener("click", () => {
+        if (!idEquipoSeleccionado || !escudos[idEquipoSeleccionado]) return;
+        delete escudos[idEquipoSeleccionado];
+        mostrarEscudos();
+        actualizarBotones();
+    });
+
+    // === Funciones ===
+    function mostrarEscudos() {
+        galeriaGrid.innerHTML = "";
+        for (const id in escudos) {
+            const escudo = escudos[id];
+            const card = document.createElement("div");
+            card.className = "escudo-card";
+            card.innerHTML = `
+                <img src="${escudo.src}" alt="${escudo.nombre}">
+                <p>${escudo.nombre}</p>
+            `;
+
+            // Permite seleccionar escudo haciendo clic en su tarjeta
+            card.addEventListener("click", () => {
+                galeriaGrid.querySelectorAll(".escudo-card").forEach(c => c.classList.remove("seleccionado"));
+                card.classList.add("seleccionado");
+                idEquipoSeleccionado = id;
+                selectGaleria.value = id;
+                actualizarBotones();
             });
+
+            galeriaGrid.appendChild(card);
+        }
+    }
+
+    function actualizarBotones() {
+        const tieneEscudo = escudos[idEquipoSeleccionado] !== undefined;
+        btnAgregar.disabled = !idEquipoSeleccionado || tieneEscudo;
+        btnCambiar.disabled = !tieneEscudo;
+        btnEliminar.disabled = !tieneEscudo;
     }
 });
-
-// Función para listar galería
-function listarGaleria() {
-    fetch("operaciones.php", {
-        method: "POST",
-        body: new URLSearchParams({ accion: "listarGaleria" })
-    })
-        .then(res => res.json())
-        .then(data => {
-            galeriaGrid.innerHTML = "";
-            data.data.forEach(g => {
-                const div = document.createElement("div");
-                div.className = "escudo";
-                div.innerHTML = `
-                <p>${g.equipo}</p>
-                <img src="${g.url}" alt="Escudo de ${g.equipo}" width="120">
-            `;
-                galeriaGrid.appendChild(div);
-            });
-        });
-}
-
-// Inicializa galería
-listarGaleria();
-
-
 
 
 // ======= FASE FINAL ==============
