@@ -1,4 +1,8 @@
 // =========================
+// script.js - actualizado para operar con operaciones.php
+// =========================
+
+// =========================
 // LOGIN
 // =========================
 document.addEventListener("DOMContentLoaded", () => {
@@ -43,7 +47,8 @@ document.addEventListener("DOMContentLoaded", () => {
 // =========================
 function mostrar(seccionId) {
     document.querySelectorAll(".seccion").forEach(sec => sec.style.display = "none");
-    document.getElementById(seccionId).style.display = "block";
+    const target = document.getElementById(seccionId);
+    if (target) target.style.display = "block";
 
     if (seccionId === "equipos") listarEquipos();
     if (seccionId === "partidos") listarPartidos();
@@ -105,9 +110,12 @@ async function listarEquipos() {
     const data = await res.json();
 
     const tbody = document.querySelector("#tablaEquipos tbody");
+    if (!tbody) return;
     tbody.innerHTML = "";
     data.data.forEach(eq => {
         const tr = document.createElement("tr");
+        // agrego data-id por si más adelante lo necesitas
+        tr.setAttribute("data-id", eq.id);
         tr.innerHTML = `
             <td>${eq.id}</td>
             <td>${eq.nombre}</td>
@@ -127,7 +135,7 @@ async function listarEquipos() {
 let equipoSeleccionado = null;
 let modoEdicion = false;
 
-// Detectar selección de fila
+// Detectar selección de fila (equipos)
 document.addEventListener("click", (e) => {
     if (e.target.closest("#tablaEquipos tbody tr")) {
         const fila = e.target.closest("tr");
@@ -141,11 +149,6 @@ document.addEventListener("click", (e) => {
             integrantes: fila.children[2].textContent,
             capitan: fila.children[3].textContent
         };
-
-        // Reflejar en los inputs
-        //document.getElementById("nombreEquipo").value = equipoSeleccionado.nombre;
-        //document.getElementById("numIntegrantes").value = equipoSeleccionado.integrantes;
-        //document.getElementById("capitanEquipo").value = equipoSeleccionado.capitan;
     }
 });
 
@@ -155,13 +158,11 @@ document.addEventListener("click", (e) => {
 async function editarEquipo() {
     const btnEditar = document.querySelector("button[onclick='editarEquipo()']");
 
-    // Verificar que haya selección
     if (!equipoSeleccionado) {
         alert("Selecciona primero un equipo de la tabla.");
         return;
     }
 
-    // Si estamos en modo edición → guardar cambios
     if (modoEdicion) {
         if (!confirm("¿Confirmas los cambios realizados?")) return;
 
@@ -184,39 +185,33 @@ async function editarEquipo() {
         if (data.success) {
             listarEquipos();
             cancelarOperacion();
-            //alert("Cambios guardados correctamente ✅");
         } else {
             alert("No se pudieron guardar los cambios ⚠️");
         }
 
-        btnEditar.textContent = "Editar / Guardar";
+        if (btnEditar) btnEditar.textContent = "Editar / Guardar";
         modoEdicion = false;
-    }
-    else {
-        // Entrar en modo edición
-        //const confirmar = confirm("¿Deseas editar el equipo seleccionado?");
-        //if (!confirmar) return;
-
-        // Reflejar los datos seleccionados recién ahora
+    } else {
         document.getElementById("nombreEquipo").value = equipoSeleccionado.nombre;
         document.getElementById("numIntegrantes").value = equipoSeleccionado.integrantes;
         document.getElementById("capitanEquipo").value = equipoSeleccionado.capitan;
 
-        btnEditar.textContent = "Guardar";
+        if (btnEditar) btnEditar.textContent = "Guardar";
         modoEdicion = true;
     }
 }
-
 
 // =========================
 // CANCELAR OPERACIÓN
 // =========================
 function cancelarOperacion() {
-    document.getElementById("formEquipos").reset();
+    const form = document.getElementById("formEquipos");
+    if (form) form.reset();
     document.querySelectorAll("#tablaEquipos tbody tr").forEach(tr => tr.classList.remove("seleccionado"));
     equipoSeleccionado = null;
     modoEdicion = false;
-    document.querySelector("button[onclick='editarEquipo()']").textContent = "Editar / Guardar";
+    const btn = document.querySelector("button[onclick='editarEquipo()']");
+    if (btn) btn.textContent = "Editar / Guardar";
 }
 
 // =========================
@@ -240,7 +235,6 @@ async function borrarEquipo() {
 
     const data = await res.json();
     if (data.success) {
-        //alert("Equipo eliminado correctamente 🗑️");
         listarEquipos();
         cancelarOperacion();
     }
@@ -280,6 +274,7 @@ async function listarPartidos() {
 
     const data = await res.json();
     const tbody = document.querySelector("#tablaPartidos tbody");
+    if (!tbody) return;
     tbody.innerHTML = "";
     data.data.forEach(p => {
         const tr = document.createElement("tr");
@@ -298,14 +293,13 @@ async function listarPartidos() {
 let partidoSeleccionado = null;
 let modoEdicionPartido = false;
 
-// Detectar selección de fila
+// Detectar selección de fila (partidos)
 document.addEventListener("click", (e) => {
     if (e.target.closest("#tablaPartidos tbody tr")) {
         const fila = e.target.closest("tr");
         document.querySelectorAll("#tablaPartidos tbody tr").forEach(tr => tr.classList.remove("seleccionado"));
         fila.classList.add("seleccionado");
 
-        // Guardar datos del partido seleccionado
         partidoSeleccionado = {
             id: fila.children[0].textContent,
             equipo1: fila.children[1].textContent,
@@ -350,7 +344,6 @@ async function editarPartido() {
         return;
     }
 
-    // Si estamos en modo edición → guardar cambios
     if (modoEdicionPartido) {
         if (!confirm("¿Deseas guardar los cambios realizados?")) return;
 
@@ -362,7 +355,6 @@ async function editarPartido() {
             return;
         }
 
-        // Obtener marcador editado, si no se cambió se queda igual
         const filaSeleccionada = tabla.querySelector(".seleccionado");
         const inputMarcador = filaSeleccionada.querySelector(".inputMarcador");
         const marcador = inputMarcador ? inputMarcador.value : partidoSeleccionado.marcador;
@@ -384,33 +376,29 @@ async function editarPartido() {
             cancelarOperacionPartido();
         }
 
-        btnEditar.textContent = "Editar / Guardar";
+        if (btnEditar) btnEditar.textContent = "Editar / Guardar";
         modoEdicionPartido = false;
         return;
     }
 
-    // Si no estamos en modo edición → entrar en modo edición
     modoEdicionPartido = true;
-    btnEditar.textContent = "Guardar";
+    if (btnEditar) btnEditar.textContent = "Guardar";
 
-    // Reflejar valores actuales en los selects
     select1.value = partidoSeleccionado.equipo1;
     select2.value = partidoSeleccionado.equipo2;
 
-    // Hacer editable el marcador sin limpiar el valor actual
     const filaSeleccionada = tabla.querySelector("tr.seleccionado");
     const tdMarcador = filaSeleccionada.children[2];
 
-    let valorActual = partidoSeleccionado.marcador; // valor por defecto
+    let valorActual = partidoSeleccionado.marcador;
     const inputExistente = tdMarcador.querySelector(".inputMarcador");
-    if (inputExistente) valorActual = inputExistente.value; // mantener valor si ya estaba
+    if (inputExistente) valorActual = inputExistente.value;
 
     tdMarcador.innerHTML = `
         <input type="text" class="inputMarcador" value="${valorActual}" 
-               style="width:80px; text-align:center;">
+        style="width:80px; text-align:center;">
     `;
 }
-
 
 function cancelarOperacionPartido() {
     const tabla = document.querySelector("#tablaPartidos tbody");
@@ -418,10 +406,8 @@ function cancelarOperacionPartido() {
     const select2 = document.getElementById("equipo2");
     const btnEditar = document.querySelector("button[onclick='editarPartido()']");
 
-    // Quitar la selección visual
     tabla.querySelectorAll("tr").forEach(tr => tr.classList.remove("seleccionado"));
 
-    // Restaurar marcador original en input readonly
     if (partidoSeleccionado) {
         const filaSeleccionada = tabla.querySelector(`tr[data-id='${partidoSeleccionado.id}']`);
         if (filaSeleccionada) {
@@ -430,124 +416,254 @@ function cancelarOperacionPartido() {
         }
     }
 
-    // Resetear selects
     if (select1) select1.selectedIndex = 0;
     if (select2) select2.selectedIndex = 0;
 
-    // Restaurar variables y botón
     partidoSeleccionado = null;
     modoEdicionPartido = false;
     if (btnEditar) btnEditar.textContent = "Editar / Guardar";
 }
 
 
+// =========================
+// GALERÍA DE ESCUDOS (integrada con operaciones.php)
+// =========================
 
+/*
+  Reglas:
+  - operaciones.php espera:
+    - POST con FormData: { accion: 'agregarEscudo' | 'cambiarEscudo', escudo: <file>, equipo: <nombreEquipo> }
+    - Para eliminar: POST body urlencoded { accion: 'eliminarEscudo', equipo: <nombreEquipo> }
+    - Para listar: POST body urlencoded { accion: 'listarGaleria' }
+*/
 
-// =========================
-// GALERÍA DE ESCUDOS
-// =========================
-// =========================
-// GALERÍA DE ESCUDOS (versión final dinámica)
-// =========================
+let idEquipoSeleccionado = null;
+const escudos = {}; // { equipoNombre: { nombre, src } }
+
 
 document.addEventListener("DOMContentLoaded", () => {
+
+    async function listarGaleria() {
+        // pide a operaciones.php la lista (data/galeria.json)
+        try {
+            const res = await fetch("operaciones.php", {
+                method: "POST",
+                body: new URLSearchParams({ accion: "listarGaleria" })
+            });
+            const data = await res.json();
+            if (!data.ok) {
+                console.error("Error listarGaleria:", data);
+                return;
+            }
+            // data.data es array de { equipo, url }
+            // Limpiar escudos y poblar
+            Object.keys(escudos).forEach(k => delete escudos[k]);
+            (data.data || []).forEach(item => {
+                // item.equipo es el identificador que usamos (en tu PHP usas el nombre del equipo)
+                escudos[item.equipo] = {
+                    nombre: item.equipo,
+                    src: item.url // suponemos que ruta pública ya está construida en PHP (p.ej. '/escudos/archivo.png')
+                };
+            });
+            // actualizar UI
+            mostrarEscudos();
+            actualizarBotones(); // por si no hay selección
+        } catch (err) {
+            console.error("Error cargando galería:", err);
+        }
+    }
+
+    // Helper: subir archivo al servidor usando operaciones.php
+    async function subirArchivoAlServidor(archivo, equipo, accion) {
+        const form = new FormData();
+        form.append("escudo", archivo);
+        form.append("equipo", equipo);
+        form.append("accion", accion); // 'agregarEscudo' o 'cambiarEscudo'
+
+        const res = await fetch("operaciones.php", {
+            method: "POST",
+            body: form
+        });
+
+        if (!res.ok) {
+            const txt = await res.text();
+            throw new Error("Error al subir: " + txt);
+        }
+
+        const data = await res.json();
+        if (!data.ok) throw new Error(data.error || "Respuesta inválida del servidor");
+        return data.url;
+    }
+
+    async function eliminarEscudoServidor(equipo) {
+        const res = await fetch("operaciones.php", {
+            method: "POST",
+            body: new URLSearchParams({ accion: "eliminarEscudo", equipo })
+        });
+        return await res.json(); // { ok: true } o { ok: false, error }
+    }
+
+
+    // obtener referencias (si existen)
     const selectGaleria = document.getElementById("selectGaleria");
     const btnAgregar = document.getElementById("btnAgregar");
     const btnCambiar = document.getElementById("btnCambiar");
     const btnEliminar = document.getElementById("btnEliminar");
     const galeriaGrid = document.getElementById("galeriaGrid");
 
-    let idEquipoSeleccionado = null;
-    const escudos = {}; // { idEquipo: { nombre, src } }
+    // si no existe el selectGaleria significa que la vista actual no tiene galería, así que no hacemos nada
+    if (!selectGaleria) return;
 
-    // ✅ Esperar a que los equipos se carguen en el select
-    // (se asume que ya están cargados dinámicamente desde tu sistema)
-    // Si los equipos se cargan después con JS, este listener seguirá funcionando bien
-
-    // === Evento cambio en select (cuando se elige un equipo) ===
+    // cuando se cargan equipos, actualizarCombosEquipos (desde listarEquipos) llenará el select
     selectGaleria.addEventListener("change", () => {
         idEquipoSeleccionado = selectGaleria.value;
         actualizarBotones();
         mostrarEscudos();
     });
 
-    // === Agregar Escudo ===
-    btnAgregar.addEventListener("click", () => {
-        if (!idEquipoSeleccionado) return;
+    // AGREGAR
+    if (btnAgregar) {
+        btnAgregar.addEventListener("click", () => {
+            if (!idEquipoSeleccionado) return;
 
-        const input = document.createElement("input");
-        input.type = "file";
-        input.accept = "image/*";
+            const input = document.createElement("input");
+            input.type = "file";
+            input.accept = "image/*";
 
-        input.onchange = e => {
-            const archivo = e.target.files[0];
-            if (!archivo) return;
+            input.onchange = async e => {
+                const archivo = e.target.files[0];
+                if (!archivo) return;
 
-            const lector = new FileReader();
-            lector.onload = ev => {
-                const nombreEquipo = selectGaleria.options[selectGaleria.selectedIndex].text;
-                escudos[idEquipoSeleccionado] = {
-                    nombre: nombreEquipo,
-                    src: ev.target.result
-                };
-                mostrarEscudos();
-                actualizarBotones();
+                try {
+                    const urlServidor = await subirArchivoAlServidor(archivo, idEquipoSeleccionado, "agregarEscudo");
+                    escudos[idEquipoSeleccionado] = {
+                        nombre: idEquipoSeleccionado,
+                        src: urlServidor
+                    };
+                    mostrarEscudos();
+                    actualizarBotones();
+                } catch (err) {
+                    console.error(err);
+                    alert("No se pudo subir el escudo: " + err.message);
+                }
             };
-            lector.readAsDataURL(archivo);
-        };
 
-        input.click();
-    });
+            input.click();
+        });
+    }
 
-    // === Cambiar Escudo ===
-    btnCambiar.addEventListener("click", () => {
-        if (!idEquipoSeleccionado || !escudos[idEquipoSeleccionado]) return;
+    // CAMBIAR
+    if (btnCambiar) {
+        btnCambiar.addEventListener("click", () => {
+            if (!idEquipoSeleccionado || !escudos[idEquipoSeleccionado]) return;
 
-        const input = document.createElement("input");
-        input.type = "file";
-        input.accept = "image/*";
+            const input = document.createElement("input");
+            input.type = "file";
+            input.accept = "image/*";
 
-        input.onchange = e => {
-            const archivo = e.target.files[0];
-            if (!archivo) return;
+            input.onchange = async e => {
+                const archivo = e.target.files[0];
+                if (!archivo) return;
 
-            const lector = new FileReader();
-            lector.onload = ev => {
-                escudos[idEquipoSeleccionado].src = ev.target.result;
-                mostrarEscudos();
+                try {
+                    const urlServidor = await subirArchivoAlServidor(archivo, idEquipoSeleccionado, "cambiarEscudo");
+                    escudos[idEquipoSeleccionado].src = urlServidor;
+                    mostrarEscudos();
+                } catch (err) {
+                    console.error(err);
+                    alert("No se pudo actualizar el escudo: " + err.message);
+                }
             };
-            lector.readAsDataURL(archivo);
-        };
 
-        input.click();
-    });
+            input.click();
+        });
+    }
 
-    // === Eliminar Escudo ===
-    btnEliminar.addEventListener("click", () => {
-        if (!idEquipoSeleccionado || !escudos[idEquipoSeleccionado]) return;
-        delete escudos[idEquipoSeleccionado];
-        mostrarEscudos();
-        actualizarBotones();
-    });
+    // ELIMINAR
+    if (btnEliminar) {
+        btnEliminar.addEventListener("click", async () => {
+            if (!idEquipoSeleccionado || !escudos[idEquipoSeleccionado]) return;
 
-    // === Funciones ===
+            if (!confirm(`¿Deseas eliminar el escudo de "${idEquipoSeleccionado}"?`)) return;
+
+            try {
+                const data = await eliminarEscudoServidor(idEquipoSeleccionado);
+                if (data.ok) {
+                    delete escudos[idEquipoSeleccionado];
+                    mostrarEscudos();
+                    actualizarBotones();
+                } else {
+                    alert("No se pudo eliminar el escudo: " + (data.error || "error desconocido"));
+                }
+            } catch (err) {
+                console.error(err);
+                alert("Error al eliminar en el servidor: " + err.message);
+            }
+        });
+    }
+
+    // ----- Funciones de UI para la galería (deben estar en ámbito global) -----
+    let lastRenderedKeys = null;
+
     function mostrarEscudos() {
+        // obtener elementos cuando se requiere (puede llamarse antes de DOMContentLoaded en algunos flujos)
+        const galeriaGrid = document.getElementById("galeriaGrid");
+        const selectGaleria = document.getElementById("selectGaleria");
+
+        if (!galeriaGrid) return;
+
+        const keys = Object.keys(escudos).sort().join(',');
+        if (lastRenderedKeys === keys) return;
+        lastRenderedKeys = keys;
+
         galeriaGrid.innerHTML = "";
+
         for (const id in escudos) {
             const escudo = escudos[id];
             const card = document.createElement("div");
             card.className = "escudo-card";
-            card.innerHTML = `
-                <img src="${escudo.src}" alt="${escudo.nombre}">
-                <p>${escudo.nombre}</p>
-            `;
 
-            // Permite seleccionar escudo haciendo clic en su tarjeta
+            const img = document.createElement("img");
+
+            // Normalizar src recibido
+            // Normalizar src recibido
+            let src = String(escudo.src || '');
+            src = src.replace(/^file:\/\//i, '').replace(/^[a-zA-Z]:\\/, '').replace(/\\/g, '/').trim();
+
+            if (!/^https?:\/\//i.test(src) && !src.startsWith('/')) {
+                src = '/' + src;
+            }
+
+            img.src = src;
+
+            try {
+                const parts = src.split('?');
+                parts[0] = parts[0].split('/').map(encodeURIComponent).join('/');
+                src = parts.join('?');
+            } catch (e) { /* ignore */ }
+
+            img.src = src;
+            img.alt = escudo.nombre || id;
+            img.style.maxWidth = "100%";
+            img.style.display = "block";
+
+            img.onerror = function () {
+                img.onerror = null; // prevenir loop
+                // ajusta ruta aquí si tu placeholder está en otro sitio
+                img.src = '/img/placeholder.png';
+            };
+
+            const p = document.createElement("p");
+            p.textContent = escudo.nombre || id;
+
+            card.appendChild(img);
+            card.appendChild(p);
+
             card.addEventListener("click", () => {
                 galeriaGrid.querySelectorAll(".escudo-card").forEach(c => c.classList.remove("seleccionado"));
                 card.classList.add("seleccionado");
                 idEquipoSeleccionado = id;
-                selectGaleria.value = id;
+                if (selectGaleria) selectGaleria.value = id;
                 actualizarBotones();
             });
 
@@ -556,12 +672,23 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function actualizarBotones() {
-        const tieneEscudo = escudos[idEquipoSeleccionado] !== undefined;
+        const selectGaleria = document.getElementById("selectGaleria");
+        const btnAgregar = document.getElementById("btnAgregar");
+        const btnCambiar = document.getElementById("btnCambiar");
+        const btnEliminar = document.getElementById("btnEliminar");
+
+        if (!btnAgregar || !btnCambiar || !btnEliminar || !selectGaleria) return;
+
+        const tieneEscudo = !!escudos[idEquipoSeleccionado];
         btnAgregar.disabled = !idEquipoSeleccionado || tieneEscudo;
         btnCambiar.disabled = !tieneEscudo;
         btnEliminar.disabled = !tieneEscudo;
     }
+
+    // al cargar la página de galería, pedir la lista actual
+    listarGaleria();
 });
+
 
 //===========================================================================================
 // FASE FINAL
@@ -573,6 +700,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const faseInicio = document.getElementById("faseInicio");
     const btnGenerarRonda = document.getElementById("btnGenerarRonda");
 
+    if (!btnGenerarRonda) return;
     btnGenerarRonda.addEventListener("click", () => {
         if (!equiposGanadores.length) {
             alert("No hay ganadores registrados de los partidos.");
@@ -603,6 +731,7 @@ function registrarGanadoresPartidos() {
 // ================= Generar Fase Final =================
 function generarFaseFinal(fase) {
     const rondasContainer = document.getElementById("rondasContainer");
+    if (!rondasContainer) return;
     rondasContainer.innerHTML = "";
 
     let equipos = [...equiposGanadores];
@@ -618,7 +747,6 @@ function generarFaseFinal(fase) {
 
     while (equipos.length >= 2) {
         crearTablaRonda(rondaActual, equipos);
-        // Preparar siguiente ronda con ganadores "-"
         const siguienteRonda = [];
         for (let i = 0; i < Math.floor(equipos.length / 2); i++) {
             siguienteRonda.push("-", "-");
@@ -630,13 +758,13 @@ function generarFaseFinal(fase) {
         else break;
     }
 
-    // Actualizar automáticamente con ganadores válidos
     actualizarSiguienteRonda();
 }
 
 // ================= Crear Tabla de Cada Ronda =================
 function crearTablaRonda(nombreRonda, equipos) {
     const rondasContainer = document.getElementById("rondasContainer");
+    if (!rondasContainer) return;
     const div = document.createElement("div");
     div.style.marginTop = "20px";
     div.innerHTML = `<h2>${nombreRonda.charAt(0).toUpperCase() + nombreRonda.slice(1)}</h2>`;
@@ -676,7 +804,7 @@ function crearTablaRonda(nombreRonda, equipos) {
         tbody.appendChild(tr);
 
         const inputMarcador = tr.querySelector(".inputMarcador");
-        inputMarcador.addEventListener("blur", () => { // cambiar input a "blur" para procesar al terminar
+        inputMarcador.addEventListener("blur", () => {
             actualizarGanadorFila(tr);
             actualizarSiguienteRonda();
         });
@@ -707,6 +835,7 @@ function actualizarGanadorFila(fila) {
 // ================= Actualizar Siguiente Ronda =================
 function actualizarSiguienteRonda() {
     const rondasContainer = document.getElementById("rondasContainer");
+    if (!rondasContainer) return;
     const tablas = rondasContainer.querySelectorAll("table");
 
     for (let t = 0; t < tablas.length - 1; t++) {
@@ -736,10 +865,9 @@ function actualizarSiguienteRonda() {
 }
 
 
-
 // ====================================================================================================
 
-//CODIGO PARTE GALERIA
+// CODIGO PARTE GALERIA - helpers adicionales
 function actualizarCombosEquipos(equipos) {
     const select1 = document.getElementById("equipo1");
     const select2 = document.getElementById("equipo2");
@@ -754,7 +882,7 @@ function actualizarCombosEquipos(equipos) {
 
     equipos.forEach(eq => {
         const opt1 = document.createElement("option");
-        opt1.value = eq.nombre;
+        opt1.value = eq.nombre;    // usamos nombre como identificador, que es lo que espera tu PHP
         opt1.textContent = eq.nombre;
         select1.appendChild(opt1);
 
@@ -765,8 +893,11 @@ function actualizarCombosEquipos(equipos) {
         selectGaleria.appendChild(opt3);
     });
 
-    // Activar botones de galería cuando haya equipos
-    document.getElementById("btnAgregar").disabled = equipos.length === 0;
-    document.getElementById("btnCambiar").disabled = equipos.length === 0;
-    document.getElementById("btnEliminar").disabled = equipos.length === 0;
+    // Activar/desactivar botones de galería según haya equipos
+    const btnAgregar = document.getElementById("btnAgregar");
+    const btnCambiar = document.getElementById("btnCambiar");
+    const btnEliminar = document.getElementById("btnEliminar");
+    if (btnAgregar) btnAgregar.disabled = equipos.length === 0;
+    if (btnCambiar) btnCambiar.disabled = equipos.length === 0;
+    if (btnEliminar) btnEliminar.disabled = equipos.length === 0;
 }
