@@ -278,13 +278,16 @@ async function listarPartidos() {
     tbody.innerHTML = "";
     data.data.forEach(p => {
         const tr = document.createElement("tr");
+        tr.setAttribute("data-id", p.id);
+        tr.setAttribute("data-equipo1-id", p.equipo1_id);  // Asegúrate de que el PHP devuelva estos campos
+        tr.setAttribute("data-equipo2-id", p.equipo2_id);
         tr.innerHTML = `
             <td>${p.id}</td>
-            <td>${p.equipo1}</td>
+            <td>${p.equipo1_nombre}</td>
             <td>
                 <input type="text" class="inputMarcador" value="${p.marcador}" style="width:80px;text-align:center;" readonly>
             </td>
-            <td>${p.equipo2}</td>
+            <td>${p.equipo2_nombre}</td>
         `;
         tbody.appendChild(tr);
     });
@@ -294,6 +297,7 @@ let partidoSeleccionado = null;
 let modoEdicionPartido = false;
 
 // Detectar selección de fila (partidos)
+// Detectar selección de fila (partidos)
 document.addEventListener("click", (e) => {
     if (e.target.closest("#tablaPartidos tbody tr")) {
         const fila = e.target.closest("tr");
@@ -301,9 +305,11 @@ document.addEventListener("click", (e) => {
         fila.classList.add("seleccionado");
 
         partidoSeleccionado = {
-            id: fila.children[0].textContent,
+            id: fila.getAttribute("data-id"),
+            equipo1_id: fila.getAttribute("data-equipo1-id"),
             equipo1: fila.children[1].textContent,
             marcador: fila.children[2].textContent,
+            equipo2_id: fila.getAttribute("data-equipo2-id"),
             equipo2: fila.children[3].textContent
         };
     }
@@ -381,11 +387,14 @@ async function editarPartido() {
         return;
     }
 
+    // ...
     modoEdicionPartido = true;
     if (btnEditar) btnEditar.textContent = "Guardar";
 
-    select1.value = partidoSeleccionado.equipo1;
-    select2.value = partidoSeleccionado.equipo2;
+    // Usar los IDs para setear los selects
+    select1.value = partidoSeleccionado.equipo1_id;
+    select2.value = partidoSeleccionado.equipo2_id;
+    // ...
 
     const filaSeleccionada = tabla.querySelector("tr.seleccionado");
     const tdMarcador = filaSeleccionada.children[2];
@@ -437,14 +446,16 @@ function cancelarOperacionPartido() {
     - Para listar: POST body urlencoded { accion: 'listarGaleria' }
 */
 
-let idEquipoSeleccionado = null;
-const escudos = {}; // { equipoNombre: { nombre, src } }
+// =========================
+// GALERÍA DE ESCUDOS (integrada con operaciones.php)
+// =========================
 
+let idEquipoSeleccionado = null;
+const escudos = {}; // { equipo_id: { nombre, src } } - ¡CAMBIADO!
 
 document.addEventListener("DOMContentLoaded", () => {
 
     async function listarGaleria() {
-        // pide a operaciones.php la lista (data/galeria.json)
         try {
             const res = await fetch("operaciones.php", {
                 method: "POST",
@@ -455,30 +466,37 @@ document.addEventListener("DOMContentLoaded", () => {
                 console.error("Error listarGaleria:", data);
                 return;
             }
-            // data.data es array de { equipo, url }
-            // Limpiar escudos y poblar
+
+            // CORRECCIÓN: Limpiar y poblar escudos con estructura correcta
             Object.keys(escudos).forEach(k => delete escudos[k]);
             (data.data || []).forEach(item => {
-                // item.equipo es el identificador que usamos (en tu PHP usas el nombre del equipo)
-                escudos[item.equipo] = {
-                    nombre: item.equipo,
-                    src: item.url // suponemos que ruta pública ya está construida en PHP (p.ej. '/escudos/archivo.png')
-                };
+                // Buscar el equipo_id correspondiente al nombre
+                const selectGaleria = document.getElementById("selectGaleria");
+                if (selectGaleria) {
+                    const option = Array.from(selectGaleria.options).find(opt => opt.text === item.equipo);
+                    if (option) {
+                        const equipo_id = option.value;
+                        escudos[equipo_id] = {
+                            nombre: item.equipo,  // Guardamos el nombre para mostrar
+                            src: item.url
+                        };
+                    }
+                }
             });
-            // actualizar UI
+
             mostrarEscudos();
-            actualizarBotones(); // por si no hay selección
+            actualizarBotones();
         } catch (err) {
             console.error("Error cargando galería:", err);
         }
     }
 
     // Helper: subir archivo al servidor usando operaciones.php
-    async function subirArchivoAlServidor(archivo, equipo, accion) {
+    async function subirArchivoAlServidor(archivo, equipo_id, accion) {
         const form = new FormData();
         form.append("escudo", archivo);
-        form.append("equipo", equipo);
-        form.append("accion", accion); // 'agregarEscudo' o 'cambiarEscudo'
+        form.append("equipo", equipo_id); // Enviamos ID
+        form.append("accion", accion);
 
         const res = await fetch("operaciones.php", {
             method: "POST",
@@ -495,14 +513,13 @@ document.addEventListener("DOMContentLoaded", () => {
         return data.url;
     }
 
-    async function eliminarEscudoServidor(equipo) {
+    async function eliminarEscudoServidor(equipo_id) {
         const res = await fetch("operaciones.php", {
             method: "POST",
-            body: new URLSearchParams({ accion: "eliminarEscudo", equipo })
+            body: new URLSearchParams({ accion: "eliminarEscudo", equipo: equipo_id })
         });
-        return await res.json(); // { ok: true } o { ok: false, error }
+        return await res.json();
     }
-
 
     // obtener referencias (si existen)
     const selectGaleria = document.getElementById("selectGaleria");
@@ -511,10 +528,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const btnEliminar = document.getElementById("btnEliminar");
     const galeriaGrid = document.getElementById("galeriaGrid");
 
-    // si no existe el selectGaleria significa que la vista actual no tiene galería, así que no hacemos nada
     if (!selectGaleria) return;
 
-    // cuando se cargan equipos, actualizarCombosEquipos (desde listarEquipos) llenará el select
     selectGaleria.addEventListener("change", () => {
         idEquipoSeleccionado = selectGaleria.value;
         actualizarBotones();
@@ -536,10 +551,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 try {
                     const urlServidor = await subirArchivoAlServidor(archivo, idEquipoSeleccionado, "agregarEscudo");
+
+                    // CORRECCIÓN: Obtener el nombre del equipo desde el select
+                    const nombreEquipo = selectGaleria.options[selectGaleria.selectedIndex].text;
+
                     escudos[idEquipoSeleccionado] = {
-                        nombre: idEquipoSeleccionado,
+                        nombre: nombreEquipo,  // Guardamos el nombre
                         src: urlServidor
                     };
+
                     mostrarEscudos();
                     actualizarBotones();
                 } catch (err) {
@@ -584,7 +604,10 @@ document.addEventListener("DOMContentLoaded", () => {
         btnEliminar.addEventListener("click", async () => {
             if (!idEquipoSeleccionado || !escudos[idEquipoSeleccionado]) return;
 
-            if (!confirm(`¿Deseas eliminar el escudo de "${idEquipoSeleccionado}"?`)) return;
+            // CORRECCIÓN: Usar el nombre del equipo para el mensaje
+            const nombreEquipo = escudos[idEquipoSeleccionado].nombre;
+
+            if (!confirm(`¿Deseas eliminar el escudo de "${nombreEquipo}"?`)) return;
 
             try {
                 const data = await eliminarEscudoServidor(idEquipoSeleccionado);
@@ -606,7 +629,6 @@ document.addEventListener("DOMContentLoaded", () => {
     let lastRenderedKeys = null;
 
     function mostrarEscudos() {
-        // obtener elementos cuando se requiere (puede llamarse antes de DOMContentLoaded en algunos flujos)
         const galeriaGrid = document.getElementById("galeriaGrid");
         const selectGaleria = document.getElementById("selectGaleria");
 
@@ -618,14 +640,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
         galeriaGrid.innerHTML = "";
 
-        for (const id in escudos) {
-            const escudo = escudos[id];
+        for (const equipo_id in escudos) {
+            const escudo = escudos[equipo_id];
             const card = document.createElement("div");
             card.className = "escudo-card";
 
             const img = document.createElement("img");
 
-            // Normalizar src recibido
             // Normalizar src recibido
             let src = String(escudo.src || '');
             src = src.replace(/^file:\/\//i, '').replace(/^[a-zA-Z]:\\/, '').replace(/\\/g, '/').trim();
@@ -643,18 +664,17 @@ document.addEventListener("DOMContentLoaded", () => {
             } catch (e) { /* ignore */ }
 
             img.src = src;
-            img.alt = escudo.nombre || id;
+            img.alt = escudo.nombre; // CORRECCIÓN: Usar el nombre del equipo
             img.style.maxWidth = "100%";
             img.style.display = "block";
 
             img.onerror = function () {
                 img.onerror = null; // prevenir loop
-                // ajusta ruta aquí si tu placeholder está en otro sitio
                 img.src = '/img/placeholder.png';
             };
 
             const p = document.createElement("p");
-            p.textContent = escudo.nombre || id;
+            p.textContent = escudo.nombre; // CORRECCIÓN: Mostrar el nombre del equipo
 
             card.appendChild(img);
             card.appendChild(p);
@@ -662,8 +682,8 @@ document.addEventListener("DOMContentLoaded", () => {
             card.addEventListener("click", () => {
                 galeriaGrid.querySelectorAll(".escudo-card").forEach(c => c.classList.remove("seleccionado"));
                 card.classList.add("seleccionado");
-                idEquipoSeleccionado = id;
-                if (selectGaleria) selectGaleria.value = id;
+                idEquipoSeleccionado = equipo_id;
+                if (selectGaleria) selectGaleria.value = equipo_id;
                 actualizarBotones();
             });
 
@@ -867,7 +887,6 @@ function actualizarSiguienteRonda() {
 
 // ====================================================================================================
 
-// CODIGO PARTE GALERIA - helpers adicionales
 function actualizarCombosEquipos(equipos) {
     const select1 = document.getElementById("equipo1");
     const select2 = document.getElementById("equipo2");
@@ -880,9 +899,17 @@ function actualizarCombosEquipos(equipos) {
     select2.innerHTML = "";
     selectGaleria.innerHTML = "";
 
+    // Agregar opción por defecto
+    const defaultOption = document.createElement("option");
+    defaultOption.value = "";
+    defaultOption.textContent = "Selecciona un equipo";
+    select1.appendChild(defaultOption.cloneNode(true));
+    select2.appendChild(defaultOption.cloneNode(true));
+    selectGaleria.appendChild(defaultOption.cloneNode(true));
+
     equipos.forEach(eq => {
         const opt1 = document.createElement("option");
-        opt1.value = eq.nombre;    // usamos nombre como identificador, que es lo que espera tu PHP
+        opt1.value = eq.id; // Ahora usamos el ID
         opt1.textContent = eq.nombre;
         select1.appendChild(opt1);
 
@@ -895,9 +922,7 @@ function actualizarCombosEquipos(equipos) {
 
     // Activar/desactivar botones de galería según haya equipos
     const btnAgregar = document.getElementById("btnAgregar");
-    const btnCambiar = document.getElementById("btnCambiar");
     const btnEliminar = document.getElementById("btnEliminar");
     if (btnAgregar) btnAgregar.disabled = equipos.length === 0;
-    if (btnCambiar) btnCambiar.disabled = equipos.length === 0;
     if (btnEliminar) btnEliminar.disabled = equipos.length === 0;
 }

@@ -1,28 +1,29 @@
 <?php
 header('Content-Type: application/json');
 session_start();
+require_once 'conexion.php';
 
 // ====== LOGIN ======
 if (isset($_POST['accion']) && $_POST['accion'] === 'login') {
-    $usuarios_validos = [
-        ['usuario' => 'admin', 'contra' => '1234'],
-        ['usuario' => 'enrique', 'contra' => '1212'],
-        ['usuario' => 'isc', 'contra' => 'coding']
-    ];
-
+    $database = new Database();
+    $db = $database->getConnection();
+    
     $usuario = $_POST['usuario'] ?? '';
     $contra = $_POST['contra'] ?? '';
-    $valido = false;
-
-    foreach ($usuarios_validos as $user) {
-        if ($user['usuario'] === $usuario && $user['contra'] === $contra) {
-            $valido = true;
-            $_SESSION['usuario'] = $usuario;
-            break;
-        }
+    
+    // Consulta a la base de datos
+    $query = "SELECT * FROM usuarios WHERE usuario = :usuario AND contra = :contra";
+    $stmt = $db->prepare($query);
+    $stmt->bindParam(':usuario', $usuario);
+    $stmt->bindParam(':contra', $contra);
+    $stmt->execute();
+    
+    if ($stmt->rowCount() > 0) {
+        $_SESSION['usuario'] = $usuario;
+        echo json_encode(['success' => true]);
+    } else {
+        echo json_encode(['success' => false]);
     }
-
-    echo json_encode(['success' => $valido]);
     exit;
 }
 
@@ -33,318 +34,280 @@ if (isset($_POST['accion']) && $_POST['accion'] === 'logout') {
     exit;
 }
 
-// ====== BLOQUE DE OPERACIONES (Equipos, Partidos, Galería) ======
+// Verificar sesión para operaciones protegidas
+if (!isset($_SESSION['usuario'])) {
+    echo json_encode(['error' => 'No autenticado']);
+    exit;
+}
 
-// Usamos archivos JSON locales para simular almacenamiento persistente
-$archivoEquipos = "equipos.json";
-$archivoPartidos = "partidos.json";
-// Nota: para la galería usaremos "data/galeria.json" (asegúrate que exista la carpeta data)
-$archivoGaleria = "data/galeria.json";
-
-// Crea archivos vacíos si no existen
-if (!file_exists($archivoEquipos)) file_put_contents($archivoEquipos, json_encode([]));
-if (!file_exists($archivoPartidos)) file_put_contents($archivoPartidos, json_encode([]));
-if (!file_exists(dirname($archivoGaleria))) mkdir(dirname($archivoGaleria), 0777, true);
-if (!file_exists($archivoGaleria)) file_put_contents($archivoGaleria, json_encode([]));
-
-$equipos = json_decode(file_get_contents($archivoEquipos), true);
-$partidos = json_decode(file_get_contents($archivoPartidos), true);
-$galeria = json_decode(file_get_contents($archivoGaleria), true);
-
+$database = new Database();
+$db = $database->getConnection();
 $accion = $_POST['accion'] ?? '';
 
 switch ($accion) {
     // === EQUIPOS ===
     case 'crearEquipo':
-        $nuevo = [
-            'id' => count($equipos) + 1,
-            'nombre' => $_POST['nombre'],
-            'integrantes' => $_POST['integrantes'],
-            'capitan' => $_POST['capitan']
-        ];
-        $equipos[] = $nuevo;
-        file_put_contents($archivoEquipos, json_encode($equipos));
-        echo json_encode(['success' => true, 'data' => $nuevo]);
+        try {
+            $query = "INSERT INTO equipos (nombre, num_integrantes, capitan) VALUES (:nombre, :integrantes, :capitan)";
+            $stmt = $db->prepare($query);
+            $stmt->bindParam(':nombre', $_POST['nombre']);
+            $stmt->bindParam(':integrantes', $_POST['integrantes']);
+            $stmt->bindParam(':capitan', $_POST['capitan']);
+            $stmt->execute();
+            
+            echo json_encode(['success' => true, 'id' => $db->lastInsertId()]);
+        } catch (PDOException $e) {
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
         break;
 
     case 'listarEquipos':
-        echo json_encode(['success' => true, 'data' => $equipos]);
+        try {
+            $query = "SELECT * FROM equipos ORDER BY id";
+            $stmt = $db->prepare($query);
+            $stmt->execute();
+            $equipos = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            echo json_encode(['success' => true, 'data' => $equipos]);
+        } catch (PDOException $e) {
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
         break;
 
     case 'editarEquipo':
-        $id = $_POST['id'];
-        foreach ($equipos as &$eq) {
-            if ($eq['id'] == $id) {
-                $eq['nombre'] = $_POST['nombre'];
-                $eq['integrantes'] = $_POST['integrantes'];
-                $eq['capitan'] = $_POST['capitan'];
-                break;
-            }
+        try {
+            $query = "UPDATE equipos SET nombre = :nombre, num_integrantes = :integrantes, capitan = :capitan WHERE id = :id";
+            $stmt = $db->prepare($query);
+            $stmt->bindParam(':id', $_POST['id']);
+            $stmt->bindParam(':nombre', $_POST['nombre']);
+            $stmt->bindParam(':integrantes', $_POST['integrantes']);
+            $stmt->bindParam(':capitan', $_POST['capitan']);
+            $stmt->execute();
+            
+            echo json_encode(['success' => true]);
+        } catch (PDOException $e) {
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
         }
-        file_put_contents($archivoEquipos, json_encode($equipos));
-        echo json_encode(['success' => true]);
         break;
 
     case 'borrarEquipo':
-        $id = $_POST['id'];
-        $equipos = array_filter($equipos, fn($eq) => $eq['id'] != $id);
-        file_put_contents($archivoEquipos, json_encode(array_values($equipos)));
-        echo json_encode(['success' => true]);
+        try {
+            $query = "DELETE FROM equipos WHERE id = :id";
+            $stmt = $db->prepare($query);
+            $stmt->bindParam(':id', $_POST['id']);
+            $stmt->execute();
+            
+            echo json_encode(['success' => true]);
+        } catch (PDOException $e) {
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
         break;
 
     // === PARTIDOS ===
     case 'crearPartido':
-        $nuevo = [
-            'id' => count($partidos) + 1,
-            'equipo1' => $_POST['equipo1'],
-            'equipo2' => $_POST['equipo2'],
-            'marcador' => $_POST['marcador'] ?? '0 - 0'
-        ];
-        $partidos[] = $nuevo;
-        file_put_contents($archivoPartidos, json_encode($partidos));
-        echo json_encode(['success' => true, 'data' => $nuevo]);
+        try {
+            $query = "INSERT INTO partidos (equipo1_id, equipo2_id, marcador) VALUES (:equipo1, :equipo2, '0-0')";
+            $stmt = $db->prepare($query);
+            $stmt->bindParam(':equipo1', $_POST['equipo1']);
+            $stmt->bindParam(':equipo2', $_POST['equipo2']);
+            $stmt->execute();
+            
+            echo json_encode(['success' => true, 'id' => $db->lastInsertId()]);
+        } catch (PDOException $e) {
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
         break;
 
     case 'listarPartidos':
+    try {
+        $query = "SELECT p.id, p.equipo1_id, p.equipo2_id, p.marcador, 
+                         e1.nombre as equipo1_nombre, 
+                         e2.nombre as equipo2_nombre 
+                  FROM partidos p 
+                  JOIN equipos e1 ON p.equipo1_id = e1.id 
+                  JOIN equipos e2 ON p.equipo2_id = e2.id 
+                  ORDER BY p.id";
+        $stmt = $db->prepare($query);
+        $stmt->execute();
+        $partidos = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
         echo json_encode(['success' => true, 'data' => $partidos]);
-        break;
+    } catch (PDOException $e) {
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    }
+    break;
 
     case 'editarPartido':
-        $id = $_POST['id'];
-        foreach ($partidos as &$p) {
-            if ($p['id'] == $id) {
-                $p['equipo1'] = $_POST['equipo1'];
-                $p['equipo2'] = $_POST['equipo2'];
-                $p['marcador'] = $_POST['marcador'];
-                break;
-            }
+        try {
+            $query = "UPDATE partidos SET equipo1_id = :equipo1, equipo2_id = :equipo2, marcador = :marcador WHERE id = :id";
+            $stmt = $db->prepare($query);
+            $stmt->bindParam(':id', $_POST['id']);
+            $stmt->bindParam(':equipo1', $_POST['equipo1']);
+            $stmt->bindParam(':equipo2', $_POST['equipo2']);
+            $stmt->bindParam(':marcador', $_POST['marcador']);
+            $stmt->execute();
+            
+            echo json_encode(['success' => true]);
+        } catch (PDOException $e) {
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
         }
-        file_put_contents($archivoPartidos, json_encode($partidos));
-        echo json_encode(['success' => true]);
         break;
 
     case 'borrarPartido':
-        $id = $_POST['id'];
-        $partidos = array_filter($partidos, fn($p) => $p['id'] != $id);
-        file_put_contents($archivoPartidos, json_encode(array_values($partidos)));
-        echo json_encode(['success' => true]);
+        try {
+            $query = "DELETE FROM partidos WHERE id = :id";
+            $stmt = $db->prepare($query);
+            $stmt->bindParam(':id', $_POST['id']);
+            $stmt->execute();
+            
+            echo json_encode(['success' => true]);
+        } catch (PDOException $e) {
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
         break;
 
-    // =========================
-    // GALERÍA DE ESCUDOS (actualizada para subir archivos y guardar copia local)
-    // =========================
+    // === GALERÍA DE ESCUDOS ===
     case 'listarGaleria':
-        // Asegurar archivo
-        if (!file_exists($archivoGaleria)) {
-            file_put_contents($archivoGaleria, json_encode([]));
+        try {
+            $query = "SELECT e.id as equipo_id, e.nombre as equipo, esc.ruta_archivo as url 
+                      FROM equipos e 
+                      LEFT JOIN escudos esc ON e.id = esc.equipo_id 
+                      WHERE esc.ruta_archivo IS NOT NULL";
+            $stmt = $db->prepare($query);
+            $stmt->execute();
+            $galeria = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            echo json_encode(["ok" => true, "data" => $galeria]);
+        } catch (PDOException $e) {
+            echo json_encode(["ok" => false, "error" => $e->getMessage()]);
         }
-        $galeria = json_decode(file_get_contents($archivoGaleria), true);
-        echo json_encode(["ok" => true, "data" => $galeria]);
         break;
 
     case 'agregarEscudo':
     case 'cambiarEscudo':
-        // rutas y límites
-        $maxSize = 5 * 1024 * 1024; // 5 MB
-
-        $dirRel = 'escudos'; // carpeta pública relativa en la raíz del proyecto
-        $dirFS = __DIR__ . DIRECTORY_SEPARATOR . $dirRel . DIRECTORY_SEPARATOR;
-
-
-        // asegurar carpeta escudos
-        if (!file_exists($dirFS)) {
-            if (!mkdir($dirFS, 0777, true)) {
-                http_response_code(500);
-                echo json_encode(['ok' => false, 'error' => 'No se pudo crear carpeta de escudos']);
-                exit;
+        try {
+            // CORRECCIÓN: Ahora recibimos el ID del equipo, no el nombre
+            $equipo_id = $_POST['equipo'];
+            
+            // Obtener nombre del equipo para el nombre de archivo
+            $query = "SELECT nombre FROM equipos WHERE id = :id";
+            $stmt = $db->prepare($query);
+            $stmt->bindParam(':id', $equipo_id);
+            $stmt->execute();
+            $equipo = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            if (!$equipo) {
+                throw new Exception("Equipo no encontrado");
             }
-        }
-
-        // asegurar archivo galeria
-        if (!file_exists($archivoGaleria)) {
-            file_put_contents($archivoGaleria, json_encode([]));
-        }
-        $galeria = json_decode(file_get_contents($archivoGaleria), true);
-        if (!is_array($galeria)) $galeria = [];
-
-        $equipo = isset($_POST['equipo']) ? preg_replace('/[^a-zA-Z0-9_\-]/', '', $_POST['equipo']) : null;
-        if (!$equipo) {
-            http_response_code(400);
-            echo json_encode(['ok' => false, 'error' => 'Falta parámetro equipo']);
-            exit;
-        }
-
-        if (!isset($_FILES['escudo'])) {
-            http_response_code(400);
-            echo json_encode(['ok' => false, 'error' => 'No se recibió ningún archivo']);
-            exit;
-        }
-
-        $file = $_FILES['escudo'];
-        if ($file['error'] !== UPLOAD_ERR_OK) {
-            http_response_code(400);
-            echo json_encode(['ok' => false, 'error' => 'Error en la subida: ' . $file['error']]);
-            exit;
-        }
-
-        if ($file['size'] > $maxSize) {
-            http_response_code(400);
-            echo json_encode(['ok' => false, 'error' => 'Archivo demasiado grande (máx 5 MB)']);
-            exit;
-        }
-
-        // validar que sea imagen
-        $info = @getimagesize($file['tmp_name']);
-        if ($info === false) {
-            http_response_code(400);
-            echo json_encode(['ok' => false, 'error' => 'El archivo no es una imagen válida']);
-            exit;
-        }
-
-        $mime = $info['mime'];
-        $ext = '';
-        switch ($mime) {
-            case 'image/jpeg':
-                $ext = '.jpg';
-                break;
-            case 'image/png':
-                $ext = '.png';
-                break;
-            case 'image/gif':
-                $ext = '.gif';
-                break;
-            case 'image/webp':
-                $ext = '.webp';
-                break;
-            default:
-                http_response_code(400);
-                echo json_encode(['ok' => false, 'error' => 'Tipo de imagen no soportado']);
-                exit;
-        }
-
-        // generar nombre único
-        $nombreUnico = $equipo . '_' . time() . '_' . mt_rand(1000, 999999) . $ext;
-        $rutaDestinoFS = $dirFS . $nombreUnico;
-
-        // ruta pública que devolverá el script (ajusta si tu app usa un base path distinto)
-       // $rutaPublica = trim($dirRel, '/') . '/' . $nombreUnico; // -> "escudos/nombre.png"
-
-        $rutaPublica = '/LIGA_FUT/' . trim($dirRel, '/') . '/' . $nombreUnico;
-
-        // mover archivo
-        if (!move_uploaded_file($file['tmp_name'], $rutaDestinoFS)) {
-            http_response_code(500);
-            echo json_encode(['ok' => false, 'error' => 'No se pudo guardar el archivo en el servidor']);
-            exit;
-        }
-
-        // si es cambiarEscudo, eliminar la antigua si existe
-        $found = false;
-        foreach ($galeria as $idx => $g) {
-            if (isset($g['equipo']) && strval($g['equipo']) === strval($equipo)) {
-                // eliminar archivo antiguo (si existe y no es la misma ruta)
-                if (!empty($g['url'])) {
-                    // construir ruta absoluta posible (quita leading slash si lo tiene)
-                    $possible = __DIR__ . DIRECTORY_SEPARATOR . ltrim($g['url'], '/\\');
-                    if (file_exists($possible) && is_file($possible) && realpath($possible) !== realpath($rutaDestinoFS)) {
-                        @unlink($possible);
-                    }
-                }
-                // actualizar url
-                $galeria[$idx]['url'] = $rutaPublica;
-                $found = true;
-                break;
+            
+            $equipo_nombre = $equipo['nombre'];
+            
+            // Configuración de subida
+            $maxSize = 5 * 1024 * 1024;
+            $dirRel = 'escudos';
+            $dirFS = __DIR__ . DIRECTORY_SEPARATOR . $dirRel . DIRECTORY_SEPARATOR;
+            
+            if (!file_exists($dirFS)) {
+                mkdir($dirFS, 0777, true);
             }
+            
+            if (!isset($_FILES['escudo'])) {
+                throw new Exception("No se recibió ningún archivo");
+            }
+            
+            $file = $_FILES['escudo'];
+            if ($file['error'] !== UPLOAD_ERR_OK) {
+                throw new Exception("Error en la subida: " . $file['error']);
+            }
+            
+            if ($file['size'] > $maxSize) {
+                throw new Exception("Archivo demasiado grande (máx 5 MB)");
+            }
+            
+            $info = @getimagesize($file['tmp_name']);
+            if ($info === false) {
+                throw new Exception("El archivo no es una imagen válida");
+            }
+            
+            $mime = $info['mime'];
+            $ext = '';
+            switch ($mime) {
+                case 'image/jpeg': $ext = '.jpg'; break;
+                case 'image/png': $ext = '.png'; break;
+                case 'image/gif': $ext = '.gif'; break;
+                case 'image/webp': $ext = '.webp'; break;
+                default: throw new Exception("Tipo de imagen no soportado");
+            }
+            
+            $nombreUnico = $equipo_nombre . '_' . time() . '_' . mt_rand(1000, 999999) . $ext;
+            $rutaDestinoFS = $dirFS . $nombreUnico;
+            $rutaPublica = '/' . trim($dirRel, '/') . '/' . $nombreUnico;
+            
+            if (!move_uploaded_file($file['tmp_name'], $rutaDestinoFS)) {
+                throw new Exception("No se pudo guardar el archivo en el servidor");
+            }
+            
+            // Verificar si ya existe un escudo para este equipo
+            $queryCheck = "SELECT id FROM escudos WHERE equipo_id = :equipo_id";
+            $stmtCheck = $db->prepare($queryCheck);
+            $stmtCheck->bindParam(':equipo_id', $equipo_id);
+            $stmtCheck->execute();
+            
+            if ($stmtCheck->rowCount() > 0) {
+                // Actualizar
+                $query = "UPDATE escudos SET ruta_archivo = :ruta WHERE equipo_id = :equipo_id";
+            } else {
+                // Insertar
+                $query = "INSERT INTO escudos (equipo_id, ruta_archivo) VALUES (:equipo_id, :ruta)";
+            }
+            
+            $stmt = $db->prepare($query);
+            $stmt->bindParam(':equipo_id', $equipo_id);
+            $stmt->bindParam(':ruta', $rutaPublica);
+            $stmt->execute();
+            
+            echo json_encode(['ok' => true, 'url' => $rutaPublica]);
+            
+        } catch (Exception $e) {
+            echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
         }
-
-        if (!$found) {
-            // agregar nuevo registro
-            $galeria[] = ['equipo' => $equipo, 'url' => $rutaPublica];
-        }
-
-        // guardar galeria.json
-        if (file_put_contents($archivoGaleria, json_encode(array_values($galeria), JSON_PRETTY_PRINT)) === false) {
-            // archivo guardado pero no se pudo actualizar galeria.json
-            echo json_encode(['ok' => true, 'url' => $rutaPublica, 'warning' => 'No se pudo actualizar galeria.json']);
-            exit;
-        }
-
-        echo json_encode(['ok' => true, 'url' => $rutaPublica]);
         break;
 
     case 'eliminarEscudo':
-    // asegurar archivo galeria
-    if (!file_exists($archivoGaleria)) {
-        echo json_encode(["ok" => false, "error" => "No existe archivo de galería"]);
-        break;
-    }
-
-    $equipo = isset($_POST['equipo']) ? preg_replace('/[^a-zA-Z0-9_\-]/', '', $_POST['equipo']) : null;
-    if (!$equipo) {
-        http_response_code(400);
-        echo json_encode(['ok' => false, 'error' => 'Falta parámetro equipo']);
-        exit;
-    }
-
-    $galeria = json_decode(file_get_contents($archivoGaleria), true);
-    if (!is_array($galeria)) $galeria = [];
-
-    $deleted = false;
-    foreach ($galeria as $i => $g) {
-        if (isset($g['equipo']) && strval($g['equipo']) === strval($equipo)) {
-            // obtener url guardada
-            $url = isset($g['url']) ? trim($g['url']) : '';
-
-            if ($url !== '') {
-                // normalizar y mapear url a ruta en el sistema de archivos
-                $url_sin_slash = ltrim($url, '/\\');
-
-                // Si tu JSON almacena "LIGA_FUT/escudos/..." o "/LIGA_FUT/escudos/..."
-                // quitamos el posible prefijo del nombre del proyecto (case-insensitive)
-                $url_sin_slash = preg_replace('#^liga_fut/?#i', '', $url_sin_slash);
-
-                // ruta absoluta posible
-                $possible = realpath(__DIR__ . DIRECTORY_SEPARATOR . $url_sin_slash);
-
-                // ruta del directorio escudos en FS (normalizada)
-                $dirEscudosFS = realpath(__DIR__ . DIRECTORY_SEPARATOR . 'escudos');
-
-                // seguridad: asegurarnos que la ruta del archivo esté dentro de la carpeta escudos
-                if ($possible && $dirEscudosFS && strpos($possible, $dirEscudosFS) === 0) {
-                    if (file_exists($possible) && is_file($possible)) {
-                        if (!@unlink($possible)) {
-                            // no se pudo borrar (p. ej. por permisos). Devuelve error indicando path para debug
-                            echo json_encode(['ok' => false, 'error' => 'No se pudo eliminar el archivo (permisos?)', 'path' => $possible]);
-                            exit;
-                        }
-                    }
-                } else {
-                    // No estaba dentro de escudos: no intentamos borrar por seguridad.
-                    // (Opcional: loggear para debug)
+        try {
+            // CORRECCIÓN: Ahora recibimos el ID del equipo, no el nombre
+            $equipo_id = $_POST['equipo'];
+            
+            // Obtener información del escudo
+            $query = "SELECT ruta_archivo FROM escudos WHERE equipo_id = :equipo_id";
+            $stmt = $db->prepare($query);
+            $stmt->bindParam(':equipo_id', $equipo_id);
+            $stmt->execute();
+            $escudo = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            if ($escudo) {
+                // Eliminar archivo físico
+                $rutaArchivo = __DIR__ . $escudo['ruta_archivo'];
+                if (file_exists($rutaArchivo)) {
+                    unlink($rutaArchivo);
                 }
+                
+                // Eliminar de la base de datos
+                $query = "DELETE FROM escudos WHERE equipo_id = :equipo_id";
+                $stmt = $db->prepare($query);
+                $stmt->bindParam(':equipo_id', $equipo_id);
+                $stmt->execute();
             }
-
-            // eliminar el registro del arreglo galeria
-            array_splice($galeria, $i, 1);
-
-            // guardar galeria.json
-            if (file_put_contents($archivoGaleria, json_encode(array_values($galeria), JSON_PRETTY_PRINT)) === false) {
-                echo json_encode(['ok' => false, 'error' => 'No se pudo actualizar galeria.json']);
-                exit;
-            }
-
+            
             echo json_encode(['ok' => true]);
-            $deleted = true;
-            break;
+            
+        } catch (Exception $e) {
+            echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
         }
-    }
-
-    if (!$deleted) {
-        echo json_encode(["ok" => false, "error" => "Escudo no encontrado"]);
-    }
-    break;
+        break;
 
     default:
         echo json_encode(['error' => 'Acción no reconocida']);
         break;
 }
+?>
